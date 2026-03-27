@@ -1,0 +1,30 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Room",
+      "description": "A multiplayer Tic-Tac-Toe game room",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "hostName": { "type": "string" },
+        "guestId": { "type": "string" },
+        "guestName": { "type": "string" },
+        "board": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "turn": { "type": "string", "enum": ["X", "O"] },
+        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] },
+        "winner": { "type": "string", "enum": ["X", "O", "draw", ""] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["hostId", "hostName", "board", "turn", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/Room" },
+      "description": "Active game rooms"
+    }
+  }
+}

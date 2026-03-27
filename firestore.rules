@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isParticipant() {
+      return isAuthenticated() && (
+        request.auth.uid == resource.data.hostId || 
+        ('guestId' in resource.data && request.auth.uid == resource.data.guestId)
+      );
+    }
+
+    function isValidRoom(data) {
+      return data.keys().hasAll(['hostId', 'hostName', 'board', 'turn', 'status', 'createdAt']) &&
+             data.board is list && data.board.size() == 9 &&
+             data.turn in ['X', 'O'] &&
+             data.status in ['waiting', 'playing', 'finished'];
+    }
+
+    match /rooms/{roomId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() &&
+                    isValidRoom(request.resource.data) &&
+                    request.resource.data.hostId == request.auth.uid &&
+                    request.resource.data.status == 'waiting';
+                    
+      allow update: if isAuthenticated() &&
+                    isValidRoom(request.resource.data) &&
+                    request.resource.data.hostId == resource.data.hostId &&
+                    request.resource.data.createdAt == resource.data.createdAt &&
+                    (
+                      // Case 1: Guest joining
+                      (resource.data.status == 'waiting' && 
+                       request.resource.data.status == 'playing' &&
+                       !('guestId' in resource.data) &&
+                       request.resource.data.guestId == request.auth.uid) ||
+                      
+                      // Case 2: Gameplay updates by participants
+                      (isParticipant() && 
+                       ('guestId' in resource.data) && 
+                       request.resource.data.guestId == resource.data.guestId) ||
+                       
+                      // Case 3: Host resetting or closing room before guest joins
+                      (request.auth.uid == resource.data.hostId)
+                    );
+                    
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.hostId;
+    }
+  }
+}
