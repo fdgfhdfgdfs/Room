@@ -6,18 +6,35 @@
       "properties": {
         "hostId": { "type": "string" },
         "status": { "type": "string", "enum": ["waiting", "asking", "answering", "judging"] },
+        "gameMode": { "type": "string", "enum": ["custom", "auto"] },
         "playerOrder": { "type": "array", "items": { "type": "string" } },
         "players": { "type": "object" },
         "currentAskerIndex": { "type": "number" },
         "currentQuestion": { "type": "string" },
+        "currentQuestionData": { "type": "object" },
+        "askedQuestions": { "type": "array", "items": { "type": "string" } },
         "answers": { "type": "object" },
         "questionStartedAt": { "type": "number" }
+      }
+    },
+    "Question": {
+      "title": "Question",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "correctAnswer": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "question": { "type": "string" }
       }
     }
   },
   "firestore": {
     "rooms/{roomId}": {
       "schema": { "$ref": "#/entities/Room" }
+    },
+    "questions/{questionId}": {
+      "schema": { "$ref": "#/entities/Question" }
     }
   }
 }

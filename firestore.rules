@@ -4,11 +4,13 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+    
     match /rooms/{roomId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /questions/{questionId} {
+      allow read, write: if isAuthenticated();
     }
   }
 }
