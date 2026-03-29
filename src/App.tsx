@@ -5,7 +5,6 @@ import { doc, setDoc, getDoc, updateDoc, onSnapshot, deleteDoc, collection, getD
 import { LogOut, Copy, LogIn, Play, Check, X, Clock, Trophy, ArrowRight, Users, Dices, MessageCircleQuestion, Pencil } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { VoiceChat } from './components/VoiceChat';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,7 +17,6 @@ interface PlayerData {
   name: string;
   score: number;
   usedBets: number[];
-  peerId?: string | null;
 }
 
 interface AnswerData {
@@ -716,9 +714,6 @@ export default function App() {
             <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
-        
-        <VoiceChat roomId={roomId} userId={user.uid} players={roomData.players} />
-
         <button onClick={leaveRoom} className="flex items-center gap-1 sm:gap-1.5 text-slate-400 hover:text-red-400 transition-colors font-bold bg-slate-800 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border border-slate-700">
           <span className="hidden sm:inline text-sm">مغادرة</span>
           <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
