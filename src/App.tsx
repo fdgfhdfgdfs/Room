@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, signInWithGoogle, logout } from './firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, onSnapshot, deleteDoc, collection, getDocs, addDoc } from 'firebase/firestore';
 import { LogOut, Copy, LogIn, Play, Check, X, Clock, Trophy, ArrowRight, Users, Dices, MessageCircleQuestion, Pencil } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -471,14 +471,15 @@ export default function App() {
     setSelectedBet(null);
   };
 
+  // الجزء الذي تم تعديله لحل مشكلة الشاشة البيضاء
   const handleSignIn = async () => {
     if (isSigningIn) return;
     setIsSigningIn(true);
     try {
-      await signInWithGoogle();
+      const provider = new GoogleAuthProvider();
+      await signInWithRedirect(auth, provider);
     } catch (err) {
       console.error(err);
-    } finally {
       setIsSigningIn(false);
     }
   };
