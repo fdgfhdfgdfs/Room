@@ -1,5 +1,5 @@
 {
-  "name": "تحدي كرة القدم",
-  "description": "لعبة أسئلة ورهانات متعددة اللاعبين مع ميزة المحادثة الصوتية",
-  "requestFramePermissions": ["microphone"]
+  "name": "Tic-Tac-Toe Multiplayer",
+  "description": "A real-time multiplayer Tic-Tac-Toe game with room codes.",
+  "requestFramePermissions": []
 }
