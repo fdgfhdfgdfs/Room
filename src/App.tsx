@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, signInWithGoogle, logout } from './firebase';
-import { onAuthStateChanged, User, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { onAuthStateChanged, User, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, onSnapshot, deleteDoc, collection, getDocs, addDoc } from 'firebase/firestore';
 import { LogOut, Copy, LogIn, Play, Check, X, Clock, Trophy, ArrowRight, Users, Dices, MessageCircleQuestion, Pencil } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -70,20 +70,34 @@ export default function App() {
   const [judgments, setJudgments] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const savedName = localStorage.getItem(`customName_${currentUser.uid}`);
-        if (savedName) {
-          setCustomName(savedName);
-          setIsNameSet(true);
-        } else {
-          setCustomName(currentUser.displayName || '');
-          setIsNameSet(false);
-        }
+    let unsubscribe = () => {};
+
+    const checkAuth = async () => {
+      try {
+        // ننتظر استقبال بيانات المستخدم بعد عودته من صفحة تسجيل الدخول
+        await getRedirectResult(auth);
+      } catch (error) {
+        console.error("Redirect auth error:", error);
       }
-      setLoadingAuth(false);
-    });
+      
+      unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        if (currentUser) {
+          const savedName = localStorage.getItem(`customName_${currentUser.uid}`);
+          if (savedName) {
+            setCustomName(savedName);
+            setIsNameSet(true);
+          } else {
+            setCustomName(currentUser.displayName || '');
+            setIsNameSet(false);
+          }
+        }
+        setLoadingAuth(false);
+      });
+    };
+
+    checkAuth();
+
     return () => unsubscribe();
   }, []);
 
@@ -116,7 +130,6 @@ export default function App() {
         if (remaining === 0) {
           clearInterval(interval);
           
-          // Auto-submit logic for all players
           if (user && !roomData.answers[user.uid] && roomData.playerOrder.includes(user.uid)) {
             const isAsker = !roomData.isDecisive && roomData.gameMode === 'custom' && user.uid === roomData.playerOrder[roomData.currentAskerIndex];
             if (!isAsker) {
@@ -142,7 +155,6 @@ export default function App() {
             }
           }
 
-          // Auto Mode or Decisive Question: Host auto-judges after a 2-second delay to allow auto-submits
           if ((roomData.gameMode === 'auto' || roomData.isDecisive) && user?.uid === roomData.hostId) {
             setTimeout(async () => {
               try {
@@ -150,7 +162,7 @@ export default function App() {
                 if (!roomSnap.exists()) return;
                 const latestRoomData = roomSnap.data() as RoomData;
                 
-                if (latestRoomData.status !== 'answering') return; // Prevent double scoring
+                if (latestRoomData.status !== 'answering') return;
                 
                 const newPlayers = { ...latestRoomData.players };
                 Object.entries(latestRoomData.answers as Record<string, AnswerData>).forEach(([uid, ans]) => {
@@ -178,7 +190,6 @@ export default function App() {
               }
             }, 2000);
           } 
-          // Custom Mode: Current asker transitions to judging after 2 seconds
           else if (!roomData.isDecisive && roomData.gameMode === 'custom' && user?.uid === roomData.playerOrder[roomData.currentAskerIndex]) {
             setTimeout(() => {
               updateDoc(doc(db, 'rooms', roomId!), { status: 'judging' }).catch(console.error);
@@ -192,7 +203,6 @@ export default function App() {
     }
   }, [roomData?.status, roomData?.questionStartedAt, roomId, user, roomData?.currentAskerIndex, roomData?.playerOrder, roomData?.gameMode, roomData?.answers, roomData?.currentQuestionData, roomData?.players, roomData?.askedQuestions, roomData?.hostId, roomData?.roundTime, roomData?.isDecisive, answerInput, selectedBet]);
 
-  // Auto-next question effect for Auto Mode and Decisive Question
   useEffect(() => {
     if (roomData?.status === 'judging' && (roomData.gameMode === 'auto' || roomData.isDecisive) && user?.uid === roomData.hostId) {
       const timer = setTimeout(() => {
@@ -203,7 +213,7 @@ export default function App() {
         } else {
           fetchNextQuestion();
         }
-      }, 5000); // Wait 5 seconds to show the answer, then fetch next
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [roomData?.status, roomData?.gameMode, user?.uid, roomData?.hostId, roomData?.isDecisive, roomData?.askedQuestions, roomId]);
@@ -286,16 +296,12 @@ export default function App() {
     }
   };
 
-  // For Auto Mode
   const fetchNextQuestion = async () => {
     if (!roomId || !roomData) return;
     try {
-      console.log("Fetching questions from Firestore...");
       const qSnap = await getDocs(collection(db, 'questions'));
-      console.log("Fetched documents count:", qSnap.size);
       
       if (qSnap.empty) {
-        console.error("No questions found in the 'questions' collection.");
         alert("قاعدة البيانات الخاصة بك فارغة حالياً! يرجى الذهاب إلى لوحة تحكم Firebase وإضافة أسئلة في مجموعة (collection) باسم 'questions'.");
         return;
       }
@@ -310,7 +316,6 @@ export default function App() {
       }
 
       const randomQ = available[Math.floor(Math.random() * available.length)];
-      console.log("Selected question:", randomQ);
 
       await updateDoc(doc(db, 'rooms', roomId), {
         currentQuestionData: randomQ,
@@ -341,7 +346,6 @@ export default function App() {
       const allQuestions = qSnap.docs.map(d => ({ id: d.id, ...d.data() } as QuestionData));
       const asked = roomData.askedQuestions || [];
       
-      // Try to find a question matching the difficulty, otherwise fallback to any available
       let available = allQuestions.filter(q => !asked.includes(q.id) && q.difficulty === difficulty);
       if (available.length === 0) {
         available = allQuestions.filter(q => !asked.includes(q.id));
@@ -371,7 +375,6 @@ export default function App() {
     }
   };
 
-  // For Custom Mode
   const submitQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomId || !questionInput.trim() || !roomData) return;
@@ -422,7 +425,6 @@ export default function App() {
     });
   };
 
-  // For Custom Mode
   const endTurn = async () => {
     if (!roomId || !roomData) return;
     
@@ -457,7 +459,6 @@ export default function App() {
     setSelectedBet(null);
   };
 
-  // For Auto Mode
   const nextAutoRound = async () => {
     if (!roomId) return;
     await updateDoc(doc(db, 'rooms', roomId), {
@@ -471,7 +472,6 @@ export default function App() {
     setSelectedBet(null);
   };
 
-  // الجزء الذي تم تعديله لحل مشكلة الشاشة البيضاء
   const handleSignIn = async () => {
     if (isSigningIn) return;
     setIsSigningIn(true);
@@ -660,7 +660,6 @@ export default function App() {
   const isAsker = roomData.isDecisive ? false : (roomData.gameMode === 'custom' ? user.uid === currentAskerId : isHost);
   const askerName = roomData.isDecisive ? 'النظام' : (roomData.gameMode === 'custom' ? (roomData.players[currentAskerId]?.name || 'شخص ما') : 'النظام');
 
-  // Find winner if game finished
   let winner: PlayerData | null = null;
   if (roomData.status === 'finished') {
     let maxScore = -1;
@@ -722,7 +721,6 @@ export default function App() {
       </div>
 
       <div className="w-full max-w-5xl flex-1 flex flex-col lg:grid lg:grid-cols-4 gap-2 sm:gap-4 overflow-hidden">
-        {/* Scoreboard Sidebar */}
         <div className={cn(
           "lg:col-span-1 bg-slate-800 rounded-2xl border border-slate-700 p-3 shadow-xl order-2 lg:order-1 overflow-y-auto shrink-0 max-h-[25vh] lg:max-h-full",
           (roomData.status !== 'waiting' && roomData.status !== 'finished') ? "hidden lg:block" : "block"
@@ -749,7 +747,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Main Game Area */}
         <div className="lg:col-span-3 bg-slate-800 rounded-2xl border border-slate-700 p-2 sm:p-6 shadow-xl order-1 lg:order-2 flex-1 flex flex-col overflow-y-auto">
           
           <div className="mb-2 flex justify-between items-center border-b border-slate-700 pb-2 shrink-0">
@@ -873,7 +870,6 @@ export default function App() {
                   </div>
                 )
               ) : (
-                // Auto Mode Asking State
                 isHost ? (
                   <div className="text-center py-8 sm:py-12 space-y-4 sm:space-y-6">
                     <Dices className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-purple-400" />
@@ -1085,7 +1081,6 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                // Custom Mode Judging
                 isAsker ? (
                   <div className="space-y-4 sm:space-y-6">
                     <h3 className="font-black text-lg sm:text-xl text-blue-400 mb-4 sm:mb-6 flex items-center gap-2">
